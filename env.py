@@ -33,7 +33,9 @@ class CartPendulumEnv(gym.Env):
         dt: float = 1 / 240,
         frame_skip: int = 4,
         max_episode_steps: int = 2000,
-        wall_penalty: float = 0.0,
+        wall_penalty: float = 0.1,
+        reference_x: float = 0.0,
+        reference_reward_weight: float = 1.0,
         render_mode: str | None = None,
     ) -> None:
         super().__init__()
@@ -68,6 +70,8 @@ class CartPendulumEnv(gym.Env):
         self.frame_skip = int(frame_skip)
         self.max_episode_steps = int(max_episode_steps)
         self.wall_penalty = float(wall_penalty)
+        self.reference_x = float(reference_x)
+        self.reference_reward_weight = float(reference_reward_weight)
         self.render_mode = render_mode
         self._train_progress = 0
         self._step_count = 0
@@ -135,6 +139,13 @@ class CartPendulumEnv(gym.Env):
             values.extend((math.cos(body.angle), math.sin(body.angle), body.angular_velocity))
         return np.asarray(values, dtype=np.float32)
 
+    def _pendulum_tip_x(self) -> float:
+        """Return the final pendulum endpoint x coordinate in world space."""
+        tip_x = self.cart_body.position.x
+        for body, length in zip(self.link_bodies, self.segment_lengths):
+            tip_x -= length * math.sin(body.angle)
+        return tip_x
+
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         super().reset(seed=seed)
         if self.curriculum_steps == 0:
@@ -196,8 +207,10 @@ class CartPendulumEnv(gym.Env):
         hit_wall = abs(self.cart_body.position.x) >= self.slider_range - 1e-3
         angular_velocity_cost = sum(body.angular_velocity ** 2 for body in self.link_bodies)
         upright_reward = sum(math.cos(body.angle) for body in self.link_bodies)
+        reference_error = self._pendulum_tip_x() - self.reference_x
         reward = (
             upright_reward
+            - self.reference_reward_weight * reference_error ** 2
             - 0.001 * angular_velocity_cost
             - 0.0005 * self.cart_body.position.x ** 2
             - 0.0001 * clipped_action ** 2

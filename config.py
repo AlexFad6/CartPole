@@ -17,9 +17,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-acceleration", type=float, default=20.0)
     parser.add_argument("--max-velocity", type=float, default=5.0)
     parser.add_argument("--slider-range", type=float, default=2.0)
-    parser.add_argument("--wall-penalty", type=float, default=0.0)
+    parser.add_argument("--wall-penalty", type=float, default=0.1)
     parser.add_argument("--max-episode-steps", type=int, default=2000)
     parser.add_argument("--train-steps", type=int, default=300000)
+    parser.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto")
     parser.add_argument("--save-path", type=str, default="sac_pendulum")
     parser.add_argument("--load-path", type=str, default=None)
     return parser

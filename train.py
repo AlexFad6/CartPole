@@ -32,8 +32,10 @@ def main() -> None:
         batch_size=256,
         gamma=0.99,
         tau=0.005,
+        device=args.device,
         verbose=1,
     )
+    print(f"[INFO] SAC device: {model.device}")
     callbacks = None
     if args.curriculum_steps > 0:
         print(
