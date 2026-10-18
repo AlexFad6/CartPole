@@ -1,4 +1,4 @@
-# Cart + 多节被动倒立摆
+# CartPole 多节倒立平衡摆
 
 这是一个基于 **pymunk 2D**、Gymnasium 和 Stable-Baselines3 SAC 的强化学习项目。系统由沿水平滑轨移动的 cart 和 N 节被动摆杆组成，支持加速度控制、目标速度控制、pygame 可视化以及重力课程学习。
 
