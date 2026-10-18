@@ -1,4 +1,4 @@
-# CartPole 多节被动倒立摆
+# CartPole 多节倒立平衡摆
 
 基于 pymunk、Gymnasium、Stable-Baselines3 SAC 和 pygame 的 2D cart-pendulum 项目。
 
