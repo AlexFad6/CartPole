@@ -36,6 +36,7 @@ class CartPendulumEnv(gym.Env):
         wall_penalty: float = 0.1,
         reference_x: float = 0.0,
         reference_reward_weight: float = 1.0,
+        physics_iterations: int = 10,
         render_mode: str | None = None,
     ) -> None:
         super().__init__()
@@ -53,6 +54,8 @@ class CartPendulumEnv(gym.Env):
             raise ValueError("control_mode must be 'acceleration' or 'velocity'")
         if dt <= 0 or frame_skip < 1 or max_episode_steps < 1:
             raise ValueError("dt, frame_skip, and max_episode_steps must be positive")
+        if physics_iterations < 1:
+            raise ValueError("physics_iterations must be at least 1")
 
         self.num_segments = int(num_segments)
         self.segment_lengths = [float(length) for length in segment_lengths]
@@ -72,6 +75,9 @@ class CartPendulumEnv(gym.Env):
         self.wall_penalty = float(wall_penalty)
         self.reference_x = float(reference_x)
         self.reference_reward_weight = float(reference_reward_weight)
+        self.physics_iterations = int(physics_iterations)
+        self._total_mass = self.cart_mass + self.link_mass * self.num_segments
+        self._damping_factor = 1.0 - 0.002 * self.dt
         self.render_mode = render_mode
         self._train_progress = 0
         self._step_count = 0
@@ -83,6 +89,7 @@ class CartPendulumEnv(gym.Env):
         )
         self.space = pymunk.Space()
         self.space.damping = 1.0
+        self.space.iterations = self.physics_iterations
         self.cart_body: pymunk.Body
         self.link_bodies: list[pymunk.Body] = []
         self._build_physics()
@@ -183,8 +190,7 @@ class CartPendulumEnv(gym.Env):
         action_array = np.asarray(action, dtype=np.float32).reshape(-1)
         clipped_action = float(np.clip(action_array[0], -1.0, 1.0))
         if self.control_mode == "acceleration":
-            total_mass = self.cart_mass + self.link_mass * self.num_segments
-            force_x = clipped_action * self.max_acceleration * total_mass
+            force_x = clipped_action * self.max_acceleration * self._total_mass
             self.cart_body.force = (0.0, 0.0)
             self.cart_body.apply_force_at_world_point((force_x, 0.0), self.cart_body.position)
         else:
@@ -193,7 +199,7 @@ class CartPendulumEnv(gym.Env):
         for _ in range(self.frame_skip):
             self.space.step(self.dt)
             for body in self.link_bodies:
-                body.angular_velocity *= 1.0 - 0.002 * self.dt
+                body.angular_velocity *= self._damping_factor
 
             # GrooveJoint is authoritative; this prevents numerical drift past the rail.
             x = self.cart_body.position.x

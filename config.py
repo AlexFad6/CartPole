@@ -20,6 +20,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--wall-penalty", type=float, default=0.1)
     parser.add_argument("--max-episode-steps", type=int, default=2000)
     parser.add_argument("--train-steps", type=int, default=300000)
+    parser.add_argument("--n-envs", type=int, default=1)
+    parser.add_argument(
+        "--physics-iterations",
+        type=int,
+        default=10,
+        help="Pymunk constraint solver iterations per physics step",
+    )
     parser.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto")
     parser.add_argument("--save-path", type=str, default="sac_pendulum")
     parser.add_argument("--load-path", type=str, default=None)
@@ -27,6 +34,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def build_env_kwargs(args: argparse.Namespace) -> dict:
+    if args.n_envs < 1:
+        raise ValueError("--n-envs must be at least 1")
+    if args.physics_iterations < 1:
+        raise ValueError("--physics-iterations must be at least 1")
     if args.lengths is not None and len(args.lengths) != args.segments:
         raise ValueError("--lengths 的数量必须等于 --segments")
     if args.curriculum_steps > 0 and args.gravity_start > args.gravity:
@@ -46,4 +57,5 @@ def build_env_kwargs(args: argparse.Namespace) -> dict:
         "slider_range": args.slider_range,
         "wall_penalty": args.wall_penalty,
         "max_episode_steps": args.max_episode_steps,
+        "physics_iterations": args.physics_iterations,
     }
