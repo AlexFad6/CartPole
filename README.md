@@ -1,1 +1,1 @@
-# inverted-pendulum
+# CartPole
