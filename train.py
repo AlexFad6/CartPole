@@ -32,12 +32,12 @@ def main() -> None:
     args = build_parser().parse_args()
     env_kwargs = build_env_kwargs(args)
     check_env(CartPendulumEnv(**env_kwargs), warn=True)
-    env_fns = [make_env(env_kwargs) for _ in range(args.n_envs)]
-    if args.n_envs == 1:
+    env_fns = [make_env(env_kwargs) for _ in range(args.num_envs)]
+    if args.num_envs == 1:
         env = DummyVecEnv(env_fns)
     else:
         env = SubprocVecEnv(env_fns, start_method="spawn")
-    print(f"[INFO] Parallel environments: {args.n_envs}")
+    print(f"[INFO] Parallel environments: {args.num_envs}")
     print(f"[INFO] Pymunk solver iterations: {args.physics_iterations}")
     model = SAC(
         "MlpPolicy",

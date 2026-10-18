@@ -20,7 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--wall-penalty", type=float, default=0.1)
     parser.add_argument("--max-episode-steps", type=int, default=2000)
     parser.add_argument("--train-steps", type=int, default=300000)
-    parser.add_argument("--n-envs", type=int, default=1)
+    parser.add_argument("--num-envs", type=int, default=1)
     parser.add_argument(
         "--physics-iterations",
         type=int,
@@ -34,8 +34,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def build_env_kwargs(args: argparse.Namespace) -> dict:
-    if args.n_envs < 1:
-        raise ValueError("--n-envs must be at least 1")
+    if args.num_envs < 1:
+        raise ValueError("--num-envs must be at least 1")
     if args.physics_iterations < 1:
         raise ValueError("--physics-iterations must be at least 1")
     if args.lengths is not None and len(args.lengths) != args.segments:

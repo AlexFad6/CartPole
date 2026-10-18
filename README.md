@@ -48,7 +48,7 @@ python train.py --device cuda
 并行训练 8 个独立环境：
 
 ```powershell
-python train.py --n-envs 8 --device cuda
+python train.py --num-envs 8 --device cuda
 ```
 
 `--train-steps` 表示 vectorized environment 的步数；8 个环境时每一步会收集 8 条 transition。Windows 下使用 `spawn` 启动子进程。
@@ -92,7 +92,7 @@ python evaluate.py --segments 2 --lengths 0.4 0.3 --load-path sac_two_link
 | `--slider-range` | `2.0` | cart 滑轨范围 |
 | `--wall-penalty` | `0.1` | 碰壁奖励惩罚 |
 | `--train-steps` | `300000` | 训练步数 |
-| `--n-envs` | `1` | 并行物理环境数量 |
+| `--num-envs` | `1` | 并行物理环境数量 |
 | `--physics-iterations` | `10` | 每个 pymunk 物理步的约束求解迭代次数 |
 | `--device` | `auto` | SAC 运行设备 |
 | `--save-path` | `sac_pendulum` | 模型保存路径 |
@@ -104,7 +104,7 @@ python evaluate.py --segments 2 --lengths 0.4 0.3 --load-path sac_two_link
 
 - 多环境并行是主要加速方式；每个环境拥有独立的 pymunk `Space`，不会共享物理状态。
 - `--physics-iterations 10` 保持默认物理精度。可在确认关节稳定性后尝试 `5`，但过低可能增加约束误差和抖动。
-- GPU 只加速 SAC 的神经网络更新，pymunk 仍由 CPU 执行；通常应先增加 `--n-envs`，再考虑 GPU。
+- GPU 只加速 SAC 的神经网络更新，pymunk 仍由 CPU 执行；通常应先增加 `--num-envs`，再考虑 GPU。
 
 ## 项目文件
 
