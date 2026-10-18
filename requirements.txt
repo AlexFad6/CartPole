@@ -1,0 +1,6 @@
+pymunk>=6.5
+gymnasium>=0.29
+stable-baselines3>=2.2
+torch>=2.0
+numpy>=1.24
+pygame>=2.5

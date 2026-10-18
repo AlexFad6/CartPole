@@ -7,6 +7,7 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+*pendulum.zip
 .Python
 .vscode
 *.code-workspace
