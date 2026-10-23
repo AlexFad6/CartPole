@@ -1,5 +1,4 @@
-"""Gymnasium environment for a 2D cart and a passive multi-link pendulum."""
-
+"""使用 pymunk 实现的 2D 小车和多连杆摆的 Gymnasium 环境。"""
 from __future__ import annotations
 
 import math
@@ -12,8 +11,7 @@ from gymnasium import spaces
 
 
 class CartPendulumEnv(gym.Env):
-    """A cart constrained to a rail with N freely rotating passive links."""
-
+    """一个约束在轨道上的小车，串行连接 N 个自由旋转的被动连杆。"""
     metadata = {"render_modes": [None]}
 
     def __init__(
@@ -23,11 +21,12 @@ class CartPendulumEnv(gym.Env):
         gravity: float = 9.81,
         gravity_start: float = 0.0,
         curriculum_steps: int = 0,
-        control_mode: str = "acceleration",
+        control_mode: str = "velocity",     # 默认控制小车速度
         max_acceleration: float = 20.0,
         max_velocity: float = 5.0,
         cart_mass: float = 1.0,
         link_mass: float = 0.1,
+        connector_mass: float = 0.253,
         link_radius: float = 0.02,
         slider_range: float = 2.0,
         dt: float = 1 / 240,
@@ -37,13 +36,14 @@ class CartPendulumEnv(gym.Env):
         reference_x: float = 0.0,
         reference_reward_weight: float = 1.0,
         physics_iterations: int = 10,
+        max_initial_cart_velocity: float = 1.0,
         render_mode: str | None = None,
     ) -> None:
         super().__init__()
         if num_segments < 1:
             raise ValueError("num_segments must be at least 1")
         if segment_lengths is None:
-            segment_lengths = [0.5] * num_segments
+            segment_lengths = [1.0] * num_segments
         if len(segment_lengths) != num_segments:
             raise ValueError("segment_lengths must contain num_segments values")
         if any(length <= 0 for length in segment_lengths):
@@ -56,6 +56,10 @@ class CartPendulumEnv(gym.Env):
             raise ValueError("dt, frame_skip, and max_episode_steps must be positive")
         if physics_iterations < 1:
             raise ValueError("physics_iterations must be at least 1")
+        if max_initial_cart_velocity < 0:
+            raise ValueError("max_initial_cart_velocity must not be negative")
+        if cart_mass <= 0 or link_mass <= 0 or connector_mass <= 0:
+            raise ValueError("cart_mass, link_mass, and connector_mass must be positive")
 
         self.num_segments = int(num_segments)
         self.segment_lengths = [float(length) for length in segment_lengths]
@@ -67,6 +71,7 @@ class CartPendulumEnv(gym.Env):
         self.max_velocity = float(max_velocity)
         self.cart_mass = float(cart_mass)
         self.link_mass = float(link_mass)
+        self.connector_mass = float(connector_mass)
         self.link_radius = float(link_radius)
         self.slider_range = float(slider_range)
         self.dt = float(dt)
@@ -76,7 +81,12 @@ class CartPendulumEnv(gym.Env):
         self.reference_x = float(reference_x)
         self.reference_reward_weight = float(reference_reward_weight)
         self.physics_iterations = int(physics_iterations)
-        self._total_mass = self.cart_mass + self.link_mass * self.num_segments
+        self.max_initial_cart_velocity = float(max_initial_cart_velocity)
+        self._total_mass = (
+            self.cart_mass
+            + self.link_mass * self.num_segments
+            + self.connector_mass * self.num_segments
+        )
         self._damping_factor = 1.0 - 0.002 * self.dt
         self.render_mode = render_mode
         self._train_progress = 0
@@ -92,6 +102,7 @@ class CartPendulumEnv(gym.Env):
         self.space.iterations = self.physics_iterations
         self.cart_body: pymunk.Body
         self.link_bodies: list[pymunk.Body] = []
+        self.connector_bodies: list[pymunk.Body] = []
         self._build_physics()
 
     def _build_physics(self) -> None:
@@ -118,19 +129,38 @@ class CartPendulumEnv(gym.Env):
             self.link_bodies.append(body)
             self.space.add(body, shape)
 
-        # Pivot anchors use each link's local lower/upper endpoint.
+        # The cart pivot is massless; every link's upper endpoint has a
+        # separate point mass that also serves as the next link's pivot.
         first_joint = pymunk.PivotJoint(
             self.cart_body, self.link_bodies[0], (0.0, 0.0), (0.0, -self.segment_lengths[0] / 2)
         )
         self.space.add(first_joint)
-        for index in range(self.num_segments - 1):
-            joint = pymunk.PivotJoint(
-                self.link_bodies[index],
-                self.link_bodies[index + 1],
-                (0.0, self.segment_lengths[index] / 2),
-                (0.0, -self.segment_lengths[index + 1] / 2),
+        for index, length in enumerate(self.segment_lengths):
+            connector = pymunk.Body(
+                self.connector_mass,
+                pymunk.moment_for_circle(self.connector_mass, 0.0, self.link_radius),
             )
-            self.space.add(joint)
+            connector.position = (0.0, length / 2)
+            connector_shape = pymunk.Circle(connector, self.link_radius)
+            connector_shape.filter = pymunk.ShapeFilter(group=1)
+            self.connector_bodies.append(connector)
+            self.space.add(connector, connector_shape)
+
+            link_connector_joint = pymunk.PivotJoint(
+                self.link_bodies[index],
+                connector,
+                (0.0, length / 2),
+                (0.0, 0.0),
+            )
+            self.space.add(link_connector_joint)
+            if index < self.num_segments - 1:
+                next_joint = pymunk.PivotJoint(
+                    connector,
+                    self.link_bodies[index + 1],
+                    (0.0, 0.0),
+                    (0.0, -self.segment_lengths[index + 1] / 2),
+                )
+                self.space.add(next_joint)
 
     def set_train_progress(self, t: int) -> None:
         """Set total training steps used by the reset-time gravity curriculum."""
@@ -169,6 +199,12 @@ class CartPendulumEnv(gym.Env):
         # The solver's settling impulses can leave tiny velocities/position
         # errors. Restore the exact analytical equilibrium before step 0.
         self._set_rest_state()
+        self.cart_body.velocity = (
+            float(self.np_random.uniform(
+                -self.max_initial_cart_velocity, self.max_initial_cart_velocity
+            )),
+            0.0,
+        )
         self._step_count = 0
         return self._get_obs(), {}
 
@@ -185,18 +221,30 @@ class CartPendulumEnv(gym.Env):
             body.angular_velocity = 0.0
             body.force = (0.0, 0.0)
             cumulative += length
+        cumulative = 0.0
+        for connector, length in zip(self.connector_bodies, self.segment_lengths):
+            cumulative += length
+            connector.position = (0.0, -cumulative)
+            connector.angle = 0.0
+            connector.velocity = (0.0, 0.0)
+            connector.angular_velocity = 0.0
+            connector.force = (0.0, 0.0)
 
     def step(self, action: np.ndarray):
         action_array = np.asarray(action, dtype=np.float32).reshape(-1)
         clipped_action = float(np.clip(action_array[0], -1.0, 1.0))
-        if self.control_mode == "acceleration":
-            force_x = clipped_action * self.max_acceleration * self._total_mass
-            self.cart_body.force = (0.0, 0.0)
-            self.cart_body.apply_force_at_world_point((force_x, 0.0), self.cart_body.position)
-        else:
-            self.cart_body.velocity = (clipped_action * self.max_velocity, 0.0)
-
         for _ in range(self.frame_skip):
+            # Hold the policy action over every physics substep in this
+            # control interval; pymunk clears applied forces after each step.
+            if self.control_mode == "acceleration":
+                force_x = clipped_action * self.max_acceleration * self._total_mass
+                self.cart_body.force = (0.0, 0.0)
+                self.cart_body.apply_force_at_world_point(
+                    (force_x, 0.0), self.cart_body.position
+                )
+            else:
+                self.cart_body.force = (0.0, 0.0)
+                self.cart_body.velocity = (clipped_action * self.max_velocity, 0.0)
             self.space.step(self.dt)
             for body in self.link_bodies:
                 body.angular_velocity *= self._damping_factor

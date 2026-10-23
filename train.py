@@ -7,6 +7,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.vec_env import VecMonitor
 
 from config import build_env_kwargs, build_parser
 from env import CartPendulumEnv
@@ -37,6 +38,7 @@ def main() -> None:
         env = DummyVecEnv(env_fns)
     else:
         env = SubprocVecEnv(env_fns, start_method="spawn")
+    env = VecMonitor(env)
     print(f"[INFO] Parallel environments: {args.num_envs}")
     print(f"[INFO] Pymunk solver iterations: {args.physics_iterations}")
     model = SAC(
@@ -48,7 +50,8 @@ def main() -> None:
         gamma=0.99,
         tau=0.005,
         device=args.device,
-        verbose=1,
+        tensorboard_log=args.tensorboard_log,
+        verbose=0,
     )
     print(f"[INFO] SAC device: {model.device}")
     callbacks = None
@@ -58,7 +61,11 @@ def main() -> None:
             f"over {args.curriculum_steps} steps"
         )
         callbacks = [GravityCurriculumCallback()]
-    model.learn(total_timesteps=args.train_steps, callback=callbacks)
+    model.learn(
+        total_timesteps=args.train_steps,
+        callback=callbacks,
+        tb_log_name="sac_cart_pendulum",
+    )
     model.save(args.save_path)
     print(f"[INFO] 模型已保存：{args.save_path}.zip")
     env.close()

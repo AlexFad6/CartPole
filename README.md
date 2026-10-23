@@ -22,7 +22,7 @@ python train.py
 单节摆：
 
 ```powershell
-python train.py --segments 1 --lengths 0.5 --train-steps 300000
+python train.py --segments 1 --lengths 1.0 --train-steps 300000
 ```
 
 课程学习：
@@ -44,6 +44,14 @@ python train.py --device cuda
 ```
 
 `--device` 可选 `auto`、`cuda` 或 `cpu`。pymunk 物理仿真仍运行在 CPU，GPU 主要加速 SAC 网络训练。
+
+训练过程不再输出 Stable-Baselines3 的终端表格，指标会写入 TensorBoard：
+
+```powershell
+tensorboard --logdir logs/tensorboard
+```
+
+然后打开浏览器访问 `http://localhost:6006`。可通过 `--tensorboard-log` 修改日志目录。
 
 并行训练 8 个独立环境：
 
@@ -81,8 +89,10 @@ python evaluate.py --segments 2 --lengths 0.4 0.3 --load-path sac_two_link
 | 参数 | 默认值 | 说明 |
 | --- | --- | --- |
 | `--segments` | `2` | 摆杆节数 |
-| `--lengths` | 自动均分 | 各节长度 |
-| `--total-length` | `1.0` | 自动均分时的总长度 |
+| `--lengths` | `[1.0, ...]` | 各节长度，默认每段 1 m |
+| `--total-length` | 空 | 指定后将总长度均分到各段 |
+| `--connector-mass` | `0.253` | 每段摆杆末端连接点质量（kg）；小车铰接点无额外质量 |
+| `--link-mass` | `0.1` | 每段摆杆质量（kg） |
 | `--gravity` | `9.81` | 终端重力 |
 | `--gravity-start` | `0.0` | 课程学习起始重力 |
 | `--curriculum-steps` | `0` | 课程学习步数 |
@@ -94,7 +104,9 @@ python evaluate.py --segments 2 --lengths 0.4 0.3 --load-path sac_two_link
 | `--train-steps` | `300000` | 训练步数 |
 | `--num-envs` | `1` | 并行物理环境数量 |
 | `--physics-iterations` | `10` | 每个 pymunk 物理步的约束求解迭代次数 |
+| `--max-initial-cart-velocity` | `1.0` | reset 时 cart 初始水平速度从 `[-值, +值]` 随机采样 |
 | `--device` | `auto` | SAC 运行设备 |
+| `--tensorboard-log` | `logs/tensorboard` | TensorBoard 日志目录 |
 | `--save-path` | `sac_pendulum` | 模型保存路径 |
 | `--load-path` | 空 | 评估时加载的模型 |
 

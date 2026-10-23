@@ -9,11 +9,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="2D cart and passive pendulum")
     parser.add_argument("--segments", type=int, default=2)
     parser.add_argument("--lengths", type=float, nargs="+", default=None)
-    parser.add_argument("--total-length", type=float, default=1.0)
+    parser.add_argument("--total-length", type=float, default=None)
+    parser.add_argument("--link-mass", type=float, default=0.1)
+    parser.add_argument("--connector-mass", type=float, default=0.253)
     parser.add_argument("--gravity", type=float, default=9.81)
     parser.add_argument("--gravity-start", type=float, default=0.0)
     parser.add_argument("--curriculum-steps", type=int, default=0)
-    parser.add_argument("--mode", choices=["acceleration", "velocity"], default="acceleration")
+    parser.add_argument("--mode", choices=["acceleration", "velocity"], default="velocity")
     parser.add_argument("--max-acceleration", type=float, default=20.0)
     parser.add_argument("--max-velocity", type=float, default=5.0)
     parser.add_argument("--slider-range", type=float, default=2.0)
@@ -27,7 +29,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=10,
         help="Pymunk constraint solver iterations per physics step",
     )
+    parser.add_argument("--max-initial-cart-velocity", type=float, default=1.0)
     parser.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto")
+    parser.add_argument("--tensorboard-log", type=str, default="logs/tensorboard")
     parser.add_argument("--save-path", type=str, default="sac_pendulum")
     parser.add_argument("--load-path", type=str, default=None)
     return parser
@@ -38,13 +42,22 @@ def build_env_kwargs(args: argparse.Namespace) -> dict:
         raise ValueError("--num-envs must be at least 1")
     if args.physics_iterations < 1:
         raise ValueError("--physics-iterations must be at least 1")
+    if args.max_initial_cart_velocity < 0:
+        raise ValueError("--max-initial-cart-velocity must not be negative")
+    if args.connector_mass <= 0:
+        raise ValueError("--connector-mass must be positive")
+    if args.link_mass <= 0:
+        raise ValueError("--link-mass must be positive")
     if args.lengths is not None and len(args.lengths) != args.segments:
         raise ValueError("--lengths 的数量必须等于 --segments")
     if args.curriculum_steps > 0 and args.gravity_start > args.gravity:
         raise ValueError("--gravity-start 不能大于 --gravity")
     lengths = args.lengths
     if lengths is None:
-        lengths = [args.total_length / args.segments] * args.segments
+        if args.total_length is None:
+            lengths = [1.0] * args.segments
+        else:
+            lengths = [args.total_length / args.segments] * args.segments
     return {
         "num_segments": args.segments,
         "segment_lengths": lengths,
@@ -54,8 +67,11 @@ def build_env_kwargs(args: argparse.Namespace) -> dict:
         "control_mode": args.mode,
         "max_acceleration": args.max_acceleration,
         "max_velocity": args.max_velocity,
+        "link_mass": args.link_mass,
+        "connector_mass": args.connector_mass,
         "slider_range": args.slider_range,
         "wall_penalty": args.wall_penalty,
         "max_episode_steps": args.max_episode_steps,
         "physics_iterations": args.physics_iterations,
+        "max_initial_cart_velocity": args.max_initial_cart_velocity,
     }
