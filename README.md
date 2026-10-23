@@ -123,7 +123,8 @@ python evaluate.py --segments 2 --lengths 0.4 0.3 --load-path sac_two_link
 - `env.py`：物理环境、动作、观测和奖励
 - `config.py`：命令行参数
 - `train.py`：SAC 训练
-- `evaluate.py`：pygame 可视化和手动控制
+- `evaluate.py`：评估入口和策略加载
+- `gui.py`：pygame 可视化和手动控制
 - `requirements.txt`：依赖列表
 
 ## 开发计划

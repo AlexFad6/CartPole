@@ -34,6 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tensorboard-log", type=str, default="logs/tensorboard")
     parser.add_argument("--save-path", type=str, default="sac_pendulum")
     parser.add_argument("--load-path", type=str, default=None)
+    parser.add_argument("-v", "--verbose", action="store_true", help="显示左上角调试信息")
     return parser
 
 
